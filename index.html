@@ -1,0 +1,160 @@
+<!doctype html>
+
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Sous Vide</title>
+  <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+  <script src="http://code.jquery.com/jquery-2.1.3.min.js"></script>
+  <script src="https://cdn.rawgit.com/nnnick/Chart.js/master/Chart.min.js"></script>
+  <script>
+
+    var chartData = {
+    labels: [0,0,0],
+    datasets: [
+    {
+    label: "Temp",
+    fillColor: "rgba(220,220,220,0.2)",
+    strokeColor: "rgba(220,220,220,1)",
+    pointColor: "rgba(220,220,220,1)",
+    pointStrokeColor: "#fff",
+    pointHighlightFill: "#fff",
+    pointHighlightStroke: "rgba(220,220,220,1)",
+    data: [0,0]
+    },
+    {
+    label: "Target",
+    fillColor: "rgba(151,187,205,0.2)",
+    strokeColor: "rgba(151,187,205,1)",
+    pointColor: "rgba(151,187,205,1)",
+    pointStrokeColor: "#fff",
+    pointHighlightFill: "#fff",
+    pointHighlightStroke: "rgba(151,187,205,1)",
+    data: [0,0]
+    },
+    {
+    label: "Out",
+    fillColor: "rgba(251,187,205,0.2)",
+    strokeColor: "rgba(251,187,205,1)",
+    pointColor: "rgba(151,187,205,1)",
+    pointStrokeColor: "#fff",
+    pointHighlightFill: "#fff",
+    pointHighlightStroke: "rgba(151,187,205,1)",
+    data: [0,0]
+    }
+    ]
+    };
+    
+    var options = {
+    scaleShowGridLines : true,
+    scaleGridLineColor : "rgba(0,0,0,.05)",
+    scaleGridLineWidth : 1,
+    scaleShowHorizontalLines: true,
+    scaleShowVerticalLines: true,
+    bezierCurve : false,
+    bezierCurveTension : 0.4,
+    pointDot : false,
+    pointDotRadius : 4,
+    pointDotStrokeWidth : 1,
+    pointHitDetectionRadius : 20,
+    datasetStroke : true,
+    datasetStrokeWidth : 2,
+    datasetFill : true,
+    legendTemplate : "<ul class=\"<%=name.toLowerCase()%>-legend\"><% for (var i=0; i<datasets.length; i++){%><li><span style=\"\
+														background-color:<%=datasets[i].strokeColor%>\"><%if(datasets[i].label){%><%=datasets[i].label%><%}%></span></li><%}%></ul>" };
+
+    var myLineChart;
+
+
+
+    $(document).ready(function() {
+	var ctx = document.getElementById("myChart").getContext("2d");
+        //Chart.defaults.global.responsive = true
+	myLineChart = new Chart(ctx).Line(chartData, options);
+	$("#legend").html(myLineChart.generateLegend())
+	setInterval("update()", 2000);
+	$("#temp").parent().css("background-color", myLineChart.datasets[0].strokeColor)
+	$("#target").parent().css("background-color", myLineChart.datasets[1].strokeColor)
+	$("#out").parent().css("background-color", myLineChart.datasets[2].strokeColor)
+    });
+    var jsonPending = false
+    function update() {
+        console.log("update")
+	if(jsonPending) {
+		console.log("request already pending")
+		return
+	}		  
+	jsonPending = true		   
+	$.getJSON("run?getjson", function(data) {
+		console.log("Got json data")
+                var temp = data.temp/100.0
+                var target = data.target/100.0
+		var out = data.out
+                var time = Math.floor(data.time/1000000)
+		var timestr = new Date().toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, time)
+		var timeh = Math.floor(time/3600)
+		var timem = Math.floor((time%3600)/60)
+		var times = Math.floor(time%60)
+		var timestr = timeh + ":"
+		if(timem < 10) timestr = timestr + "0"
+		timestr += timem + ":"					
+		if(times < 10) timestr = timestr + "0"
+		timestr += times
+
+		$("#time").html(timestr)
+		$("#temp").html(temp + "&deg;C")
+		$("#target").html(target + "&deg;C")
+		$("#out").html(out + "%")
+		myLineChart.addData([temp, target, out], timestr)
+		if(myLineChart.datasets[0].points.length >= 20)
+			myLineChart.removeData();
+	})
+        .fail(function(d, textStatus, error) {
+		console.log( "error" );
+		console.log(textStatus)
+		console.log(error)
+		$("#time").html("No connection")
+		$("#temp").html("No connection")
+		$("#target").html("No connection")
+		$("#out").html("No connection")
+	})
+	.always(function() {
+		console.log( "complete" );
+		jsonPending = false
+	});
+    }
+    function setTemp() {
+	console.log("Set value to " + $("#tempinput").val())
+        $.get("set?settemp=" + Math.floor(100*$("#tempinput").val()))
+    }
+</script>
+</head>
+<body>
+  <div>
+    <div style="float:left; margin:1em; width:13em; border: 1px solid black">
+      <div style="padding:1em; width:11em">
+	<div style="float:left; width:7em">Time</div>
+	<div id="time">NA</div>
+      </div>
+      <div style="padding:1em; width:11em">
+	<div style="float:left; width:7em">Temp</div>
+	<div id="temp">NA</div>
+      </div>
+      <div style="padding:1em; width:11em">
+	<div style="float:left; width:7em">Target</div>
+	<div id="target">NA</div>
+      </div>
+      <div style="padding:1em; width:11em">
+	<div style="float:left; width:7em">Output</div>
+	<div id="out">NA</div>
+      </div>
+      <div style="width:100%;">
+	 <input type="button" style="width: 6em; margin:0.5em" value="Reset"></button>
+         <input type="button" style="width: 3em; margin:0.5em; float:right;" onclick="setTemp()" value="Set"></input>
+         <input id="tempinput" type="number" style="width: 3em; margin:0.5em; float:right;" value="70"></input>
+      </div>
+      <input id="motorinput" type="checkbox" style="margin:0.5em">Motor on</input>
+    </div>
+    <canvas id="myChart" style="width:100%; height:100%; float:left" width="600" height="500"></canvas>
+</body>
+</html>
