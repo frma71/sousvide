@@ -1,3 +1,9 @@
+function configAndReboot(conn)
+   wifi.setmode(wifi.STATION)
+   wifi.sta.config(ssid,password)
+   node.restart()
+end
+
 function startApp()
    print("Start App")
    uart.on("data")
@@ -33,14 +39,13 @@ function wait_for_ip()
 		end
 		if(jointries == 0) then
 		   tmr.stop(0)
+		   jointries = nil
 		   startConfig()
 		else 
 		   jointries = jointries - 1
 		end
 	     end)
 end
-
-
 
 tmr.alarm(0,3000,0, wait_for_ip)
 print("Starting in 3 seconds, press q to cancel...")

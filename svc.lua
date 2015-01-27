@@ -37,13 +37,6 @@ function getjson(conn)
       conn:send("\n}")
 end
 
-function configAndReboot(conn)
-   wifi.setmode(wifi.STATION)
-   wifi.sta.config(ssid,password)
-   node.restart()
-end
-
-
 function ds_init(pin) 
    local addr
    ow.setup(pin)
