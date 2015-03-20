@@ -5,17 +5,18 @@ function configAndReboot(conn)
 end
 
 function startApp()
-   print("Start App")
-   uart.on("data")
+   dbg=net.createConnection(net.UDP)
+   dbg:connect(1234, wifi.sta.getbroadcast())
+   dbg:send("START")
    wait_for_ip = nil
    startConfig = nil
+   configAndReboot = nil
    collectgarbage("collect")
    dofile("svc.lua")
    dofile("svcweb.lua")
 end
 
 function startConfig()
-   uart.on("data")
    print("Go to config mode")
    wifi.setmode(wifi.STATIONAP)
    wifi.ap.config({ssid="Sous0001",pwd="Sousvide"})
@@ -48,12 +49,6 @@ function wait_for_ip()
 end
 
 tmr.alarm(0,3000,0, wait_for_ip)
-print("Starting in 3 seconds, press q to cancel...")
-uart.on("data","q", 
-	function() 
-	   tmr.stop(0)
-	   uart.on("data")
-	   print "Start canceled"
-	end, 1)
+print("tmr.stop(0) within 3 secs to cancel boot")
 	   
 	 

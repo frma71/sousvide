@@ -7,75 +7,94 @@
   <link rel="icon" href="data:;base64,iVBORw0KGgo=">
   <script src="http://code.jquery.com/jquery-2.1.3.min.js"></script>
   <script src="https://cdn.rawgit.com/nnnick/Chart.js/master/Chart.min.js"></script>
-  <script>
-
-    var chartData = {
-    labels: [0,0,0],
-    datasets: [
-    {
-    label: "Temp",
-    fillColor: "rgba(220,220,220,0.2)",
-    strokeColor: "rgba(220,220,220,1)",
-    pointColor: "rgba(220,220,220,1)",
-    pointStrokeColor: "#fff",
-    pointHighlightFill: "#fff",
-    pointHighlightStroke: "rgba(220,220,220,1)",
-    data: [0,0]
-    },
-    {
-    label: "Target",
-    fillColor: "rgba(151,187,205,0.2)",
-    strokeColor: "rgba(151,187,205,1)",
-    pointColor: "rgba(151,187,205,1)",
-    pointStrokeColor: "#fff",
-    pointHighlightFill: "#fff",
-    pointHighlightStroke: "rgba(151,187,205,1)",
-    data: [0,0]
-    },
-    {
-    label: "Out",
-    fillColor: "rgba(251,187,205,0.2)",
-    strokeColor: "rgba(251,187,205,1)",
-    pointColor: "rgba(151,187,205,1)",
-    pointStrokeColor: "#fff",
-    pointHighlightFill: "#fff",
-    pointHighlightStroke: "rgba(151,187,205,1)",
-    data: [0,0]
-    }
-    ]
-    };
-    
+  <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+  <script type="text/javascript">
+    google.load("visualization", "1.1", {packages: ["line"]});
+    google.setOnLoadCallback(drawChart);
+    data = []
+    idx = 15
+    spp = 1
+    cidx = 0;
     var options = {
-    scaleShowGridLines : true,
-    scaleGridLineColor : "rgba(0,0,0,.05)",
-    scaleGridLineWidth : 1,
-    scaleShowHorizontalLines: true,
-    scaleShowVerticalLines: true,
-    bezierCurve : false,
-    bezierCurveTension : 0.4,
-    pointDot : false,
-    pointDotRadius : 4,
-    pointDotStrokeWidth : 1,
-    pointHitDetectionRadius : 20,
-    datasetStroke : true,
-    datasetStrokeWidth : 2,
-    datasetFill : true,
-    legendTemplate : "<ul class=\"<%=name.toLowerCase()%>-legend\"><% for (var i=0; i<datasets.length; i++){%><li><span style=\"\
-														background-color:<%=datasets[i].strokeColor%>\"><%if(datasets[i].label){%><%=datasets[i].label%><%}%></span></li><%}%></ul>" };
+     chart: {
+      title: "SousVide control",
+      subtitle: "In degrees celcius (C)"
+     },
+     series: {
+        // Gives each series an axis name that matches the Y-axis below.
+        0: {axis: "Temps"},
+        1: {axis: "Temps"},
+        2: {axis: "Temps"},
+        3: {axis: "Temps"},
+        4: {axis: "Output",maxValue: 100}
+     },
+     axes: {
+        // Adds labels to each axis; they dont have to match the axis names.
+        y: {
+           Temps: {label: "Temp(C)"},
+           Output: {label: "Output(%)"}
+        }
+     },
+     explorer: {},
+     width: 900,
+     height: 500
+    };
 
-    var myLineChart;
+    function drawChart() {
+
+      data = new google.visualization.DataTable();
+      data.addColumn("number", "Time");
+      data.addColumn("number", "Min");
+      data.addColumn("number", "Avg");
+      data.addColumn("number", "Max");
+      data.addColumn("number", "Set");
+      data.addColumn("number", "Out");
 
 
+      chart = new google.charts.Line(document.getElementById("linechart_material"));
+    
+      var d = 0
+      chart.draw(data, options);
+    }
+    function addPoint(t,current,target,out) {
+        var last = data.getNumberOfRows()-1
+	if(cidx == 0) {
+		console.log("addPoint", " cidx=",cidx,"spp=",spp);
+		data.addRow([t, current, current, current, target, out]);
+	}
+	else {
+		console.log("updatePoint", " cidx=",cidx,"spp=",spp,"len(points)=",last);
+		data.setValue(last, 0, t)
+		data.setValue(last, 1, Math.min(data.getValue(last,1),current))
+		data.setValue(last, 2, (data.getValue(last,2) + current)/2)
+		data.setValue(last, 3, Math.max(data.getValue(last,3),current))
+		data.setValue(last, 4, target)
+		data.setValue(last, 5, out)
+	}
+	cidx++
+	
+	if(cidx == spp) {
+		cidx = 0;
+	}
 
+	if(data.getNumberOfRows() >= 20) {
+		x = []
+		for(var i = 0; i < data.getNumberOfRows()/2; i++) {
+			x.push([data.getValue(2*i,0),
+				  Math.min(data.getValue(2*i,1), data.getValue(2*i+1,1)),
+				  (data.getValue(2*i,2) + data.getValue(2*i+1,2))/2,
+				  Math.max(data.getValue(2*i,3), data.getValue(2*i+1,3)),
+				  (data.getValue(2*i,4) + data.getValue(2*i+1,4))/2,
+				  data.getValue(2*i,5)])
+		}
+		data.removeRows(0,data.getNumberOfRows())
+		data.addRows(x);
+		spp = spp * 2
+	}
+	chart.draw(data,options);
+    }
     $(document).ready(function() {
-	var ctx = document.getElementById("myChart").getContext("2d");
-        //Chart.defaults.global.responsive = true
-	myLineChart = new Chart(ctx).Line(chartData, options);
-	$("#legend").html(myLineChart.generateLegend())
 	setInterval("update()", 2000);
-	$("#temp").parent().css("background-color", myLineChart.datasets[0].strokeColor)
-	$("#target").parent().css("background-color", myLineChart.datasets[1].strokeColor)
-	$("#out").parent().css("background-color", myLineChart.datasets[2].strokeColor)
     });
     var jsonPending = false
     function update() {
@@ -90,7 +109,7 @@
                 var temp = data.temp/100.0
                 var target = data.target/100.0
 		var out = data.out
-                var time = Math.floor(data.time/1000000)
+                var time = Math.floor(data.time)
 		var timestr = new Date().toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, time)
 		var timeh = Math.floor(time/3600)
 		var timem = Math.floor((time%3600)/60)
@@ -105,9 +124,7 @@
 		$("#temp").html(temp + "&deg;C")
 		$("#target").html(target + "&deg;C")
 		$("#out").html(out + "%")
-		myLineChart.addData([temp, target, out], timestr)
-		if(myLineChart.datasets[0].points.length >= 20)
-			myLineChart.removeData();
+		addPoint(time, temp, target,out)
 	})
         .fail(function(d, textStatus, error) {
 		console.log( "error" );
@@ -155,6 +172,6 @@
       </div>
       <input id="motorinput" type="checkbox" style="margin:0.5em">Motor on</input>
     </div>
-    <canvas id="myChart" style="width:100%; height:100%; float:left" width="600" height="500"></canvas>
+    <div id="linechart_material"></div>
 </body>
 </html>

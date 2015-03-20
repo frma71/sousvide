@@ -1,11 +1,15 @@
-TEMPPIN=4 -- GPIO2
-OUTPIN=3 -- GPIO0
+-- GPIO2
+TEMPPIN=4
+-- GPIO0
+OUTPIN=3
 
 ctemp = 4000
 oldtemp = 4000
-settemp = 2700
+settemp = 5900
 
 out=0
+-- 30 second output period
+outp=30
 
 cnt = 0
 
@@ -30,7 +34,7 @@ function getjson(conn)
       conn:send(",\n\"out\": ")
       conn:send(out)
       conn:send(",\n\"time\": ")
-      conn:send(tmr.now())
+      conn:send(tmr.time())
 --      conn:send(",\n\"status\": \"")
 --      conn:send(status)
 --      conn:send("\"\n}")
@@ -61,9 +65,13 @@ end
 
 function ds_read(pin, addr)
    local crc
+   if(force_temp) then 
+      return force_temp
+   end
    ow.reset(pin)
    ow.select(pin, addr)
-   ow.write(pin, 0x44, 1)
+   ow.write(pin, 0x44,1)
+   tmr.delay(100000)
    local present = ow.reset(pin)
    ow.select(pin, addr)
    ow.write(pin,0xBE,1)
@@ -90,45 +98,56 @@ end
 --  return tint*100+tfrac/100
 --end
 
-gpio.mode(OUTPIN, gpio.OUTPUT)
-
 function regulate()
+   print(node.heap())
    tmr.wdclr()
-   ctemp = ds_read(TEMPPIN, addr)
-   
+   local t = ds_read(TEMPPIN, addr)
+   tmr.wdclr()
+   print(t)
+   if(t) then
+      ctemp = t
+      dbg:send("TEMP:" .. ctemp)
+   else
+      dbg:send("TFAIL")
+   end
+   print(node.heap())   
    local err = settemp - ctemp
    acc = acc + err;
    local delta = ctemp - oldtemp;
    local op,oi,od = (kpn*err)/kpd, (kin*acc)/kid, (kdn*delta)/kdd
+   print(node.heap())
    if(oi > 50) then  oi=50;  acc = accmax; end
    if(oi < -50) then oi=-50; acc = -accmax; end
    out = op + oi + od
+   print(node.heap())
    if out > 100 then out = 100 end
    if out < 0 then out = 0 end
+   print(node.heap())
    oldtemp=ctemp
-   output()
+--   output()
 end
 
 function output()
-   if cnt > 100 then cnt = 0 end
-   if cnt < out then 
-      gpio.write(OUTPIN,gpio.HIGH)
-   else
+   if cnt > outp then cnt = 0 end
+   if cnt < out*outp/100 then 
       gpio.write(OUTPIN,gpio.LOW)
+   else
+      gpio.write(OUTPIN,gpio.HIGH)
    end
-   cnt=cnt+2
+   cnt=cnt+1
 end
 
 function svc_start()
+   gpio.mode(OUTPIN, gpio.OUTPUT)
    addr = ds_init(TEMPPIN)
    ds_init = nil
    if(addr ~= nil) then
-      --   status = "No temp sensor detected"
-      tmr.alarm(1,1000,1,regulate)
+      regulate()
+      tmr.alarm(0,1000,1,regulate)
+   else
+      dbg:send("No sens")
    end
 end
 svc_start()
 svc_start = nil
 collectgarbage("collect")
-
-
